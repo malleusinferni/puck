@@ -1,9 +1,16 @@
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
 
+import State
+
 main :: IO ()
-main = play window black fps () frame pass pass
+main = play window black fps world frame pass pass
   where fps = 30
+        world = Editor (0, 0) 8 8
+
+drawCursor :: Editor -> Picture
+drawCursor world = inPlace $ color white $ thickCircle (size / 4) 2
+  where inPlace = onPixel (cursor world) world
 
 pass :: a -> b -> b
 pass = flip const
@@ -11,18 +18,24 @@ pass = flip const
 window :: Display
 window = InWindow "Puck" (640, 480) (5, 5)
 
-frame :: a -> Picture
-frame _ = Translate (size * negate 4) (size * negate 4) $ tiles 8 8
+frame :: Editor -> Picture
+frame world = Pictures $ tiles world ++ [drawCursor world]
 
-tiles :: Int -> Int -> Picture
-tiles w h = Pictures [ go x y | x <- [0 .. pred w], y <- [0 .. pred h] ]
+tiles :: Editor -> [Picture]
+tiles world = [ go x y | x <- [0 .. pred w], y <- [0 .. pred h] ]
   where go x y =
           Color (makeColor (down w x) (up w x) (up h y) 1) $
-          Translate (big x) (big y) $
+          onPixel (x, y) world $
           (rectangleSolid size size)
+        w = width world
+        h = height world
         up k i = fromIntegral i / fromIntegral k
         down k i = fromIntegral (k - i) / fromIntegral k
-        big = fromIntegral . (* size)
+
+onPixel :: (Int, Int) -> Editor -> Picture -> Picture
+onPixel (x, y) world = Translate (size * bigx) (size * bigy)
+  where bigx = fromIntegral $ x - width world `div` 2
+        bigy = fromIntegral $ y - height world `div` 2
 
 size :: Num a => a
 size = 32
