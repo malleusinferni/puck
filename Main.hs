@@ -1,12 +1,18 @@
 import Graphics.Gloss
+import Graphics.Gloss.Interface.Pure.Game
 
 main :: IO ()
-main = animate (InWindow "Puck" (640, 480) (5, 5))
-               black
-               frame
+main = play window black fps () frame pass pass
+  where fps = 30
 
-frame :: Float -> Picture
-frame t = Translate (size * negate 4) (size * negate 4) $ tiles 8 8
+pass :: a -> b -> b
+pass = flip const
+
+window :: Display
+window = InWindow "Puck" (640, 480) (5, 5)
+
+frame :: a -> Picture
+frame _ = Translate (size * negate 4) (size * negate 4) $ tiles 8 8
 
 tiles :: Int -> Int -> Picture
 tiles w h = Pictures [ go x y | x <- [0 .. pred w], y <- [0 .. pred h] ]
