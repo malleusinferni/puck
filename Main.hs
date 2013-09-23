@@ -39,7 +39,7 @@ doubleRainbow :: Palette
 doubleRainbow = quadInterp 8 magenta cyan red green
 
 quadInterp :: Int -> Color -> Color -> Color -> Color -> Palette
-quadInterp n bl br tl tr = concat $ zipWith mix (mix tl bl) (mix tr br)
+quadInterp n tl tr bl br = concat $ zipWith mix (mix bl tl) (mix br tr)
   where high = fromIntegral $ n - 1
         ratios = map (/ high) [0 .. high]
         mix l r = do
