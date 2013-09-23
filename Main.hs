@@ -26,6 +26,8 @@ moveCursor (EventKey (Char c) Down _ _) world =
     'u' -> go succ succ
     'b' -> go pred pred
     'n' -> go succ pred
+    'a' -> modifyPixel (\i -> succ i `mod` length (palette world)) world
+    'z' -> modifyPixel (\i -> pred i `mod` length (palette world)) world
     _ -> world
   where go f g = let dest = f *** g $ cursor world in
           if bounded dest
@@ -34,6 +36,13 @@ moveCursor (EventKey (Char c) Down _ _) world =
         bounded (x, y) = 0 <= x && x < width world &&
           0 <= y && y < height world
 moveCursor _ world = world
+
+modifyPixel :: (Int -> Int) -> Editor -> Editor
+modifyPixel f world = world { pixels = rows }
+  where rows = replace y (replace x f) $ pixels world
+        (x, y) = cursor world
+        replace 0 f (x:xs) = f x : xs
+        replace n f (x:xs) = x : replace (n - 1) f xs
 
 doubleRainbow :: Palette
 doubleRainbow = quadInterp 8 magenta cyan red green
