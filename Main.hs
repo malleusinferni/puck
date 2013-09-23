@@ -9,7 +9,7 @@ import State
 main :: IO ()
 main = play window black fps world frame moveCursor pass
   where fps = 30
-        world = Editor (0, 0) 8 8 allColors doubleRainbow
+        world = Editor (0, 0) 8 8 32 allColors doubleRainbow
 
 drawCursor :: Editor -> Picture
 drawCursor world = inPlace $ color white $ shapes
@@ -20,6 +20,7 @@ drawCursor world = inPlace $ color white $ shapes
         connect = Translate (size / 5) 0 . Scale (2/3) (5/4) $
           thickArc 180 360 (size / 8) stroke
         stroke = (5/3)
+        size = fromIntegral $ zoomFactor world
 
 moveCursor :: Event -> Editor -> Editor
 moveCursor (EventKey (Char c) Down _ _) world =
@@ -85,12 +86,11 @@ tiles world = [ go x y | x <- [0 .. pred w], y <- [0 .. pred h] ]
   where go x y = onPixel (x, y) world $ rectangleSolid size size
         w = width world
         h = height world
+        size = fromIntegral $ zoomFactor world
 
 onPixel :: (Int, Int) -> Editor -> Picture -> Picture
 onPixel (x, y) world = Color (pixelAt (x, y) world) .
     Translate (size * bigx) (size * bigy)
   where bigx = fromIntegral $ x - width world `div` 2
         bigy = fromIntegral $ y - height world `div` 2
-
-size :: Num a => a
-size = 32
+        size = fromIntegral $ zoomFactor world

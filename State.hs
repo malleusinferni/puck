@@ -10,6 +10,7 @@ data Editor = Editor
   { cursor :: (Int, Int)
   , width :: Int
   , height :: Int
+  , zoomFactor :: Int
   , pixels :: TileMap
   , palette :: Palette
   }
