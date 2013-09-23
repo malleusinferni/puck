@@ -47,8 +47,12 @@ modifyPixel :: (Int -> Int) -> Editor -> Editor
 modifyPixel f world = world { pixels = rows }
   where rows = replace y (replace x f) $ pixels world
         (x, y) = cursor world
-        replace 0 f (x:xs) = f x : xs
-        replace n f (x:xs) = x : replace (n - 1) f xs
+
+replace :: Int -> (a -> a) -> [a] -> [a]
+replace n f (x:xs)
+  | n < 1 = f x : xs
+  | otherwise = x : replace (n - 1) f xs
+replace _ _ [] = []
 
 doubleRainbow :: Palette
 doubleRainbow = quadInterp 8 magenta cyan red green
