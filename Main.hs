@@ -26,7 +26,12 @@ moveCursor (EventKey (Char c) Down _ _) world =
     'b' -> go pred pred
     'n' -> go succ pred
     _ -> world
-  where go f g = world { cursor = f *** g $ cursor world }
+  where go f g = let dest = f *** g $ cursor world in
+          if bounded dest
+             then world { cursor = dest }
+             else world
+        bounded (x, y) = 0 <= x && x < width world &&
+          0 <= y && y < height world
 moveCursor _ world = world
 
 pass :: a -> b -> b
