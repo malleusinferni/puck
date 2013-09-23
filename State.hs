@@ -13,3 +13,6 @@ data Editor = Editor
   , pixels :: TileMap
   , palette :: Palette
   }
+
+pixelAt :: (Int, Int) -> Editor -> Color
+pixelAt (x, y) world = palette world !! (pixels world !! y !! x)

@@ -63,15 +63,13 @@ frame world = Pictures $ tiles world ++ [drawCursor world]
 
 tiles :: Editor -> [Picture]
 tiles world = [ go x y | x <- [0 .. pred w], y <- [0 .. pred h] ]
-  where go x y =
-          Color (palette world !! (x + w * y)) $
-          onPixel (x, y) world $
-          (rectangleSolid size size)
+  where go x y = onPixel (x, y) world $ rectangleSolid size size
         w = width world
         h = height world
 
 onPixel :: (Int, Int) -> Editor -> Picture -> Picture
-onPixel (x, y) world = Translate (size * bigx) (size * bigy)
+onPixel (x, y) world = Color (pixelAt (x, y) world) .
+    Translate (size * bigx) (size * bigy)
   where bigx = fromIntegral $ x - width world `div` 2
         bigy = fromIntegral $ y - height world `div` 2
 
