@@ -1,16 +1,33 @@
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
 
+import Control.Arrow ((***))
+
 import State
 
 main :: IO ()
-main = play window black fps world frame pass pass
+main = play window black fps world frame moveCursor pass
   where fps = 30
         world = Editor (0, 0) 8 8
 
 drawCursor :: Editor -> Picture
 drawCursor world = inPlace $ color white $ thickCircle (size / 4) 2
   where inPlace = onPixel (cursor world) world
+
+moveCursor :: Event -> Editor -> Editor
+moveCursor (EventKey (Char c) Down _ _) world =
+  case c of
+    'h' -> go pred id
+    'j' -> go id pred
+    'k' -> go id succ
+    'l' -> go succ id
+    'y' -> go pred succ
+    'u' -> go succ succ
+    'b' -> go pred pred
+    'n' -> go succ pred
+    _ -> world
+  where go f g = world { cursor = f *** g $ cursor world }
+moveCursor _ world = world
 
 pass :: a -> b -> b
 pass = flip const
