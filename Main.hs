@@ -12,8 +12,14 @@ main = play window black fps world frame moveCursor pass
         world = Editor (0, 0) 8 8 allColors doubleRainbow
 
 drawCursor :: Editor -> Picture
-drawCursor world = inPlace $ color white $ thickCircle (size / 4) 2
+drawCursor world = inPlace $ color white $ shapes
   where inPlace = onPixel (cursor world) world
+        shapes = Pictures [outer, inner, connect]
+        outer = Scale 1 (-1) $ thickArc 65 360 (size / 4) stroke
+        inner = thickCircle (size / 8) stroke
+        connect = Translate (size / 5) 0 . Scale (2/3) (5/4) $
+          thickArc 180 360 (size / 8) stroke
+        stroke = (5/3)
 
 moveCursor :: Event -> Editor -> Editor
 moveCursor (EventKey (Char c) Down _ _) world =
