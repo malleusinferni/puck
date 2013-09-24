@@ -1,6 +1,9 @@
 import Graphics.Gloss
 import Graphics.Gloss.Interface.IO.Game
 
+import Codec.BMP (packRGBA32ToBMP, writeBMP)
+import qualified Data.ByteString as B (pack)
+
 import Control.Arrow ((***))
 import Data.List (unfoldr)
 
@@ -35,6 +38,7 @@ moveCursor (EventKey (Char c) Down _ _) world =
     'n' -> go succ pred
     'a' -> modifyPixel (\i -> succ i `mod` length (palette world)) world
     'z' -> modifyPixel (\i -> pred i `mod` length (palette world)) world
+    'w' -> saveImage world
     _ -> return world
   where go f g = do
           let dest = f *** g $ cursor world
@@ -44,6 +48,19 @@ moveCursor (EventKey (Char c) Down _ _) world =
         bounded (x, y) = 0 <= x && x < width world &&
           0 <= y && y < height world
 moveCursor _ world = return world
+
+saveImage :: Editor -> IO Editor
+saveImage world = do
+  -- Order of index generation is important!
+  let indices = [ (x, y) | y <- [ 0 .. height world - 1 ],
+                           x <- [ 0 .. width world - 1 ] ]
+      pixelToWord = map toWord . tupleToList . rgbaOfColor .
+        flip pixelAt world
+      toWord = round . (* 255)
+      tupleToList (a, b, c, d) = [a, b, c, d]
+      raws = B.pack . concatMap pixelToWord $ indices
+  writeBMP "img.bmp" $ packRGBA32ToBMP (width world) (height world) raws
+  return world
 
 modifyPixel :: (Int -> Int) -> Editor -> IO Editor
 modifyPixel f world = return world { pixels = rows }
