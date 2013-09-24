@@ -1,5 +1,5 @@
 import Graphics.Gloss
-import Graphics.Gloss.Interface.Pure.Game
+import Graphics.Gloss.Interface.IO.Game
 
 import Control.Arrow ((***))
 import Data.List (unfoldr)
@@ -7,7 +7,7 @@ import Data.List (unfoldr)
 import State
 
 main :: IO ()
-main = play window black fps world frame moveCursor pass
+main = playIO window black fps world frame moveCursor pass
   where fps = 30
         world = Editor (0, 0) 8 8 32 allColors doubleRainbow
 
@@ -22,7 +22,7 @@ drawCursor world = inPlace $ color white $ shapes
         stroke = (5/3)
         size = fromIntegral $ zoomFactor world
 
-moveCursor :: Event -> Editor -> Editor
+moveCursor :: Event -> Editor -> IO Editor
 moveCursor (EventKey (Char c) Down _ _) world =
   case c of
     'h' -> go pred id
@@ -35,17 +35,18 @@ moveCursor (EventKey (Char c) Down _ _) world =
     'n' -> go succ pred
     'a' -> modifyPixel (\i -> succ i `mod` length (palette world)) world
     'z' -> modifyPixel (\i -> pred i `mod` length (palette world)) world
-    _ -> world
-  where go f g = let dest = f *** g $ cursor world in
-          if bounded dest
-             then world { cursor = dest }
-             else world
+    _ -> return world
+  where go f g = do
+          let dest = f *** g $ cursor world
+          return $ if bounded dest
+                      then world { cursor = dest }
+                      else world
         bounded (x, y) = 0 <= x && x < width world &&
           0 <= y && y < height world
-moveCursor _ world = world
+moveCursor _ world = return world
 
-modifyPixel :: (Int -> Int) -> Editor -> Editor
-modifyPixel f world = world { pixels = rows }
+modifyPixel :: (Int -> Int) -> Editor -> IO Editor
+modifyPixel f world = return world { pixels = rows }
   where rows = replace y (replace x f) $ pixels world
         (x, y) = cursor world
 
@@ -72,14 +73,14 @@ allColors = unfoldr go [0 .. 8 * 8 - 1]
   where go [] = Nothing
         go xs = Just $ splitAt 8 xs
 
-pass :: a -> b -> b
-pass = flip const
+pass :: (Monad m) => a -> b -> m b
+pass _ = return
 
 window :: Display
 window = InWindow "Puck" (640, 480) (5, 5)
 
-frame :: Editor -> Picture
-frame world = Pictures $ tiles world ++ [drawCursor world]
+frame :: Editor -> IO Picture
+frame world = return . Pictures $ tiles world ++ [drawCursor world]
 
 tiles :: Editor -> [Picture]
 tiles world = [ go x y | x <- [0 .. pred w], y <- [0 .. pred h] ]
