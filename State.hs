@@ -1,10 +1,13 @@
 module State where
 
+import Control.Monad.Trans.State
 import Graphics.Gloss.Data.Color
 
 type Palette = [Color]
 
 type TileMap = [[Int]]
+
+type World a = StateT Editor IO a
 
 data Editor = Editor
   { cursor :: (Int, Int)
@@ -15,5 +18,8 @@ data Editor = Editor
   , palette :: Palette
   }
 
-pixelAt :: (Int, Int) -> Editor -> Color
-pixelAt (x, y) world = palette world !! (pixels world !! y !! x)
+pixelAt :: (Int, Int) -> World Color
+pixelAt (x, y) = do
+  pal <- gets palette
+  pix <- gets pixels
+  return $ pal !! (pix !! y !! x)

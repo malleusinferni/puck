@@ -4,29 +4,35 @@ import Graphics.Gloss.Interface.IO.Game
 import Codec.BMP (packRGBA32ToBMP, writeBMP)
 import qualified Data.ByteString as B (pack)
 
+import Control.Applicative ((<$>))
 import Control.Arrow ((***))
+import Control.Monad (when)
+import Control.Monad.IO.Class
+import Control.Monad.Trans.State
 import Data.List (unfoldr)
 
 import State
 
 main :: IO ()
-main = playIO window black fps world frame moveCursor pass
+main = playIO window black fps world
+         (evalStateT frame) (execStateT . moveCursor) pass
   where fps = 30
         world = Editor (0, 0) 8 8 32 allColors doubleRainbow
 
-drawCursor :: Editor -> Picture
-drawCursor world = inPlace $ color white $ shapes
-  where inPlace = onPixel (cursor world) world
-        shapes = Pictures [outer, inner, connect]
-        outer = Scale 1 (-1) $ thickArc 65 360 (size / 4) stroke
-        inner = thickCircle (size / 8) stroke
-        connect = Translate (size / 5) 0 . Scale (2/3) (5/4) $
-          thickArc 180 360 (size / 8) stroke
-        stroke = (5/3)
-        size = fromIntegral $ zoomFactor world
+drawCursor :: World Picture
+drawCursor = do
+  size <- fromIntegral <$> gets zoomFactor
+  place <- gets cursor
+  let shapes = Pictures [outer, inner, connect]
+      outer = Scale 1 (-1) $ thickArc 65 360 (size / 4) stroke
+      inner = thickCircle (size / 8) stroke
+      connect = Translate (size / 5) 0 . Scale (2/3) (5/4) $
+        thickArc 180 360 (size / 8) stroke
+      stroke = 5/3
+  onPixel place . color white $ shapes
 
-moveCursor :: Event -> Editor -> IO Editor
-moveCursor (EventKey (Char c) Down _ _) world =
+moveCursor :: Event -> World ()
+moveCursor (EventKey (Char c) Down _ _) =
   case c of
     'h' -> go pred id
     'j' -> go id pred
@@ -36,36 +42,40 @@ moveCursor (EventKey (Char c) Down _ _) world =
     'u' -> go succ succ
     'b' -> go pred pred
     'n' -> go succ pred
-    'a' -> modifyPixel (\i -> succ i `mod` length (palette world)) world
-    'z' -> modifyPixel (\i -> pred i `mod` length (palette world)) world
-    'w' -> saveImage world
-    _ -> return world
+    'a' -> paletteMod succ >>= modifyPixel
+    'z' -> paletteMod pred >>= modifyPixel
+    'w' -> saveImage
+    _ -> return ()
   where go f g = do
-          let dest = f *** g $ cursor world
-          return $ if bounded dest
-                      then world { cursor = dest }
-                      else world
-        bounded (x, y) = 0 <= x && x < width world &&
-          0 <= y && y < height world
-moveCursor _ world = return world
+          (x, y) <- (f *** g) <$> gets cursor
+          w <- gets width
+          h <- gets height
+          when (0 <= x && x < w && 0 <= y && y < h) $
+            modify (\world -> world { cursor = (x, y) })
+moveCursor _ = return ()
 
-saveImage :: Editor -> IO Editor
-saveImage world = do
+saveImage :: World ()
+saveImage = do
+  w <- gets width
+  h <- gets height
   -- Order of index generation is important!
-  let indices = [ (x, y) | y <- [ 0 .. height world - 1 ],
-                           x <- [ 0 .. width world - 1 ] ]
-      pixelToWord = map toWord . tupleToList . rgbaOfColor .
-        flip pixelAt world
+  idxs <- mapM pixelAt [ (x, y) | y <- [ 0 .. h - 1 ], x <- [ 0 .. w - 1 ] ]
+  let pixelToWord = map toWord . tupleToList . rgbaOfColor
       toWord = round . (* 255)
       tupleToList (a, b, c, d) = [a, b, c, d]
-      raws = B.pack . concatMap pixelToWord $ indices
-  writeBMP "img.bmp" $ packRGBA32ToBMP (width world) (height world) raws
-  return world
+      raws = B.pack . concatMap pixelToWord $ idxs
+  liftIO $ writeBMP "img.bmp" $ packRGBA32ToBMP w h raws
 
-modifyPixel :: (Int -> Int) -> Editor -> IO Editor
-modifyPixel f world = return world { pixels = rows }
-  where rows = replace y (replace x f) $ pixels world
-        (x, y) = cursor world
+paletteMod :: (Int -> Int) -> World (Int -> Int)
+paletteMod f = do
+  len <- length <$> gets palette
+  return (\i -> f i `mod` len)
+
+modifyPixel :: (Int -> Int) -> World ()
+modifyPixel f = do
+  (x, y) <- gets cursor
+  rows <- replace y (replace x f) <$> gets pixels
+  modify (\world -> world { pixels = rows })
 
 replace :: Int -> (a -> a) -> [a] -> [a]
 replace n f (x:xs)
@@ -96,19 +106,24 @@ pass _ = return
 window :: Display
 window = InWindow "Puck" (640, 480) (5, 5)
 
-frame :: Editor -> IO Picture
-frame world = return . Pictures $ tiles world ++ [drawCursor world]
+frame :: World Picture
+frame = do
+  ts <- tiles
+  c <- drawCursor
+  return (Pictures (ts ++ [c]))
 
-tiles :: Editor -> [Picture]
-tiles world = [ go x y | x <- [0 .. pred w], y <- [0 .. pred h] ]
-  where go x y = onPixel (x, y) world $ rectangleSolid size size
-        w = width world
-        h = height world
-        size = fromIntegral $ zoomFactor world
+tiles :: World [Picture]
+tiles = do
+  w <- gets width
+  h <- gets height
+  size <- fromIntegral <$> gets zoomFactor
+  let rect = rectangleSolid size size
+  sequence [ onPixel (x, y) rect | x <- [0 .. pred w], y <- [0 .. pred h] ]
 
-onPixel :: (Int, Int) -> Editor -> Picture -> Picture
-onPixel (x, y) world = Color (pixelAt (x, y) world) .
-    Translate (size * bigx) (size * bigy)
-  where bigx = fromIntegral $ x - width world `div` 2
-        bigy = fromIntegral $ y - height world `div` 2
-        size = fromIntegral $ zoomFactor world
+onPixel :: (Int, Int) -> Picture -> World Picture
+onPixel (x, y) pic = do
+  p <- pixelAt (x, y)
+  size <- fromIntegral <$> gets zoomFactor
+  bigx <- fromIntegral . (x -) . (`div` 2) <$> gets width
+  bigy <- fromIntegral . (y -) . (`div` 2) <$> gets height
+  return . Color p . Translate (size * bigx) (size * bigy) $ pic
