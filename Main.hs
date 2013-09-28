@@ -17,7 +17,7 @@ main :: IO ()
 main = playIO window black fps world
          (evalStateT frame) (execStateT . moveCursor) pass
   where fps = 30
-        world = Editor (0, 0) 8 8 32 allColors doubleRainbow
+        world = Editor (0, 0) 8 8 32 (allColors world) doubleRainbow
 
 drawCursor :: World Picture
 drawCursor = do
@@ -95,10 +95,14 @@ quadInterp n tl tr bl br = concat $ zipWith mix (mix bl tl) (mix br tr)
           let u = 1 - v
           return $ mixColors u v l r
 
-allColors :: TileMap
-allColors = unfoldr go [0 .. 8 * 8 - 1]
+allColors :: Editor -> TileMap
+allColors world = unfoldr go indices
   where go [] = Nothing
-        go xs = Just $ splitAt 8 xs
+        go xs = Just $ splitAt w xs
+        w = width world
+        h = height world
+        indices = map (`mod` palsize) [0 .. w * h - 1]
+        palsize = length $ palette world
 
 pass :: (Monad m) => a -> b -> m b
 pass _ = return
